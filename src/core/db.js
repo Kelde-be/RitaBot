@@ -7,10 +7,6 @@ const autoTranslate = require("./auto");
 const Sequelize = require("sequelize");
 const logger = require("./logger");
 const Op = Sequelize.Op;
-var dbBot2BotValue ="";
-var dbWebhookIDValue ="";
-var dbWebhookTokenValue ="";
-var server_obj = {};
 
 // ----------------------
 // Database Auth Process
@@ -149,19 +145,6 @@ exports.initializeDatabase = async function(client)
          });
       }
       console.log("----------------------------------------\nDatabase fully initialized.\n----------------------------------------");
-      const serversFindAll = await Servers.findAll({attributes: ["id", "embedstyle", "bot2botstyle"] });//.then((serversFindAll) =>
-      //{
-      for (let i = 0; i < serversFindAll.length; i++)
-      {
-         // eslint-disable-next-line prefer-const
-         let guild_id = serversFindAll[i].id;
-         // eslint-disable-next-line eqeqeq
-         if (guild_id != "bot")
-         {
-            server_obj[guild_id] = serversFindAll[i];
-         }
-      }
-      // });
    });
 };
 // -----------------------
@@ -170,11 +153,6 @@ exports.initializeDatabase = async function(client)
 
 exports.addServer = function(id, lang)
 {
-   server_obj[id] = {
-      embedstyle: "on",
-      bot2botstyle: "off",
-      id: id
-   };
    return Servers.create({
       id: id,
       lang: lang
@@ -206,10 +184,10 @@ exports.updateServerLang = function(id, lang, _cb)
 // -------------------------------
 // Update Embedded Variable in DB
 // -------------------------------
-
+var embedstyleVar ="";
 exports.updateEmbedVar = function(id, embedstyle, _cb)
 {
-   server_obj[id].embedstyle = embedstyle;
+   embedstyleVar = embedstyle;
    return Servers.update({ embedstyle: embedstyle }, { where: { id: id } }).then(
       function ()
       {
@@ -218,33 +196,9 @@ exports.updateEmbedVar = function(id, embedstyle, _cb)
 };
 
 // ------------------------------
-// Get Embedded Variable From DB
-// ------------------------------
-
-exports.getEmbedVar = async function run(id)
-{
-   /*
-   var value = await db.query(`select * from (select embedstyle as "embedstyle" from servers where id = ?) as table1`, { replacements: [id],
-      type: db.QueryTypes.SELECT});
-   dbEmbedValue = value[0].embedstyle;*/
-   const object = server_obj[id];
-   return object.embedstyle;/*this.setEmbedVar();*/
-};
-
-// -------------------------------------------
-// Call Saved Embedded Variable Value From DB
-// -------------------------------------------
-
-//module.exports.setEmbedVar = function(data)
-//{
-//   return dbEmbedValue;
-//};
-
-
-// ------------------------------
 // Update Bot2Bot Variable In DB
 // ------------------------------
-
+var dbBot2BotValue ="";
 exports.updateBot2BotVar = function(id, bot2botstyle, _cb)
 {
    dbBot2BotValue = bot2botstyle;
@@ -255,31 +209,11 @@ exports.updateBot2BotVar = function(id, bot2botstyle, _cb)
       });
 };
 
-// -----------------------------
-// Get Bot2Bot Variable From DB
-// -----------------------------
-
-exports.getBot2BotVar = async function run(id)
-{
-   var value = await db.query(`select * from (select bot2botstyle as "bot2botstyle" from servers where id = ?) as table2`, { replacements: [id],
-      type: db.QueryTypes.SELECT});
-   dbBot2BotValue = value[0].bot2botstyle;
-   return this.setBot2BotVar();
-};
-
-// ------------------------------------------
-// Call Saved Bot2Bot Variable Value From DB
-// ------------------------------------------
-
-module.exports.setBot2BotVar = function(data)
-{
-   return dbBot2BotValue;
-};
-
 // -----------------------------------------------
 // Update webhookID & webhookToken Variable In DB
 // -----------------------------------------------
-
+var dbWebhookIDValue ="";
+var dbWebhookTokenValue ="";
 exports.updateWebhookVar = function(id, webhookid, webhooktoken, webhookactive, _cb)
 {
    dbWebhookIDValue = webhookid;
@@ -291,31 +225,6 @@ exports.updateWebhookVar = function(id, webhookid, webhooktoken, webhookactive, 
       {
          _cb();
       });
-};
-
-// ----------------------------------------------
-// Get webhookID & webhookToken Variable From DB
-// ----------------------------------------------
-
-exports.getWebhookVar = async function run(id)
-{
-   var idValue = await db.query(`select * from (select webhookid as "webhookid" from servers where id = ?) as table2`, { replacements: [id],
-      type: db.QueryTypes.SELECT});
-   dbWebhookIDValue = idValue[0].webhookid;
-   var tokenValue = await db.query(`select * from (select webhooktoken as "webhooktoken" from servers where id = ?) as table2`, { replacements: [id],
-      type: db.QueryTypes.SELECT});
-   dbWebhookTokenValue = tokenValue[0].webhooktoken;
-
-   return this.setWebhookVar(dbWebhookIDValue, dbWebhookTokenValue);
-};
-
-// -----------------------------------------------------------
-// Call Saved webhookID & webhookToken Variable Value From DB
-// -----------------------------------------------------------
-
-module.exports.setWebhookVar = function(data)
-{
-   return; //I'M MISSING THE RETURN BIT, NOT SURE HOW OT SET THIS.
 };
 
 // -------------------
@@ -491,7 +400,10 @@ exports.getTasksCount = function(origin, cb)
 
 exports.getServersCount = function(cb)
 {
-   return server_obj.length();
+   return Servers.count().then(c =>
+   {
+      cb("", c);
+   });
 };
 
 // ---------
@@ -564,13 +476,16 @@ exports.getServerInfo = function(id, callback)
    `from tasks where origin like '@%' and server = ?) as table3, ` +
    `(select embedstyle as "embedstyle" from servers where id = ?) as table4, ` +
    `(select bot2botstyle as "bot2botstyle" from servers where id = ?) as table5, ` +
-   `(select webhookactive as "webhookactive" from servers where id = ?) as table6;`, { replacements: [ id, id, id, id, id, id],
+   `(select webhookactive as "webhookactive" from servers where id = ?) as table6,` +
+   `(select webhookid as "webhookid" from servers where id = ?) as table7,` +
+   `(select webhooktoken as "webhooktoken" from servers where id = ?) as table8;`, { replacements: [ id, id, id, id, id, id, id, id],
       type: db.QueryTypes.SELECT})
       .then(
          result => callback(result),
          err => this.updateColumns() //+ logger("error", err + "\nQuery: " + err.sql, "db")
       );
 };
+
 // ---------
 // Close DB
 // ---------
